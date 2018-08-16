@@ -3,6 +3,8 @@ from random import random
 from networkx import Graph, max_weight_matching
 
 
+# TODO: Memoize partial random computations per locality, many requests will differ in few localities
+
 class Model:
     """A (submodular) model for the utility of matchings.
 
@@ -71,6 +73,61 @@ class AdditiveModel(Model):
         return utility
 
 
+class InterviewModel(Model):
+    """Model in which agents apply for jobs in a random sequential order.
+    """
+
+    def __init__(self, num_agents, locality_caps, num_professions, professions, job_numbers,
+                 compatibility_probabilities, random_samples):
+        """Initializes the interview model.
+
+        Args:
+            num_agents (int): number of simulated agents, named i = 0, …, num_agents-1
+            locality_caps (list of int): for each locality l = 0, …, len(locality_caps), its maximum capacity
+            num_professions (int): number of different professions p = 0, …, num_professions-1
+            professions (list of int): for each agent, their profession
+            job_numbers(list of list of int): job_numbers[l][p] is the number of available jobs at locality l for
+                                              profession p
+            compatibility_probabilities(list of int): for each agent, their probability p_i of getting a job of her
+                                                      profession
+            random_samples (int): number of random experiments to estimate expectation
+        """
+        self.num_agents = num_agents
+        self.locality_caps = locality_caps
+        self.num_professions = num_professions
+        assert len(professions) == num_agents
+        self.professions = professions
+        assert len(job_numbers) == len(locality_caps)
+        assert len(job_numbers) == 0 or len(job_numbers[0]) == num_professions
+        self.job_numbers = job_numbers
+        assert len(compatibility_probabilities) == num_agents
+        self.compatibility_probabilities = compatibility_probabilities
+        assert random_samples > 0
+        self.random_samples = random_samples
+
+    def utility_for_matching(self, matching):
+        self.check_valid_matching(matching)
+
+        agents_per_locality_profession = [[[] for _ in range(self.num_professions)] for _ in self.locality_caps]
+        for i, l in enumerate(matching):
+            if l is not None:
+                p = self.professions[i]
+                agents_per_locality_profession[l][p].append(i)
+
+        sum_utilities = 0
+        for _ in range(self.random_samples):
+            for l in range(len(self.locality_caps)):
+                for p in range(self.num_professions):
+                    num_jobs = self.job_numbers[l][p]
+                    for i in agents_per_locality_profession[l][p]:
+                        for _ in range(num_jobs):
+                            if random() < self.compatibility_probabilities[i]:
+                                sum_utilities += 1
+                                num_jobs -= 1
+
+        return sum_utilities / self.random_samples
+
+
 class CoordinationModel(Model):
     """Model that randomly determines compatibilities between agents and jobs, then matches optimally.
 
@@ -95,7 +152,7 @@ class CoordinationModel(Model):
                                                                          probability that agent i is compatible with job
                                                                          j at location l
             random_samples (int): number of random experiments to estimate expectation
-            """
+        """
         self.num_agents = num_agents
         assert len(locality_caps) == len(locality_num_jobs)
         self.locality_caps = locality_caps
@@ -105,6 +162,7 @@ class CoordinationModel(Model):
         assert (num_agents == 0 or len(locality_caps) == 0
                 or len(compatibility_probabilities[0][0]) == locality_num_jobs[0])
         self.compatibility_probabilities = compatibility_probabilities
+        assert random_samples > 0
         self.random_samples = random_samples
 
     def utility_for_matching(self, matching):
