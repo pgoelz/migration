@@ -73,6 +73,62 @@ class AdditiveModel(Model):
         return utility
 
 
+class RetroactiveCorrectionModel(Model):
+    """Model in which people randomly qualitfy for employment and that number is corrected by a concave function."""
+
+    def __init__(self, num_agents, locality_caps, num_professions, professions, qualification_probabilities,
+                 correction_functions, random_samples):
+        """Initializes the retroactive correction model.
+
+        Args:
+            num_agents (int): number of simulated agents, named i = 0, …, num_agents-1
+            locality_caps (list of int): for each locality l = 0, …, len(locality_caps), its maximum capacity
+            num_professions (int): number of different professions p = 0, …, num_professions-1
+            professions (list of int): for each agent, their profession
+            qualification_probabilities (list of list of float): qualification_probabilities[i][l] is the probability
+                                                                 of agent i qualifying for employment when in locality
+                                                                 l
+            correction_functions (list of list of (int → float)): correction_functions[l][p] is the correction function
+                                                                  for locality l and profession p
+            random_samples (int): number of random experiments to estimate expectation
+        """
+        self.num_agents = num_agents
+        self.locality_caps = locality_caps
+        self.num_professions = num_professions
+        assert len(professions) == num_agents
+        self.professions = professions
+        assert len(qualification_probabilities) == num_agents
+        assert num_agents == 0 or len(qualification_probabilities[0]) == len(locality_caps)
+        self.qualification_probabilities = qualification_probabilities
+        assert len(correction_functions) == len(locality_caps)
+        assert len(locality_caps) == 0 or len(correction_functions[0]) == num_professions
+        self.correction_functions = correction_functions
+        assert random_samples > 0
+        self.random_samples = random_samples
+
+    def utility_for_matching(self, matching):
+        self.check_valid_matching(matching)
+
+        agents_per_locality_profession = [[[] for _ in range(self.num_professions)] for _ in self.locality_caps]
+        for i, l in enumerate(matching):
+            if l is not None:
+                p = self.professions[i]
+                agents_per_locality_profession[l][p].append(i)
+
+        sum_utilities = 0
+
+        for _ in range(self.random_samples):
+            for l in range(len(self.locality_caps)):
+                for p in range(self.num_professions):
+                    num_qualified = 0
+                    for i in agents_per_locality_profession[l][p]:
+                        if random() < self.qualification_probabilities[i][l]:
+                            num_qualified += 1
+                    sum_utilities += self.correction_functions[l][p](num_qualified)
+
+        return sum_utilities / self.random_samples
+
+
 class InterviewModel(Model):
     """Model in which agents apply for jobs in a random sequential order.
     """
@@ -88,7 +144,7 @@ class InterviewModel(Model):
             professions (list of int): for each agent, their profession
             job_numbers(list of list of int): job_numbers[l][p] is the number of available jobs at locality l for
                                               profession p
-            compatibility_probabilities(list of int): for each agent, their probability p_i of getting a job of her
+            compatibility_probabilities(list of float): for each agent, their probability p_i of getting a job of her
                                                       profession
             random_samples (int): number of random experiments to estimate expectation
         """
@@ -150,7 +206,7 @@ class CoordinationModel(Model):
             locality_num_jobs (list of int): for each locality l, its number of jobs j = 0, …, locality_num_jobs[l]-1
             compatibility_probabilities (list of list of list of float): compatibility_probabilities[i][l][j] is the
                                                                          probability that agent i is compatible with job
-                                                                         j at location l
+                                                                         j at locality l
             random_samples (int): number of random experiments to estimate expectation
         """
         self.num_agents = num_agents
