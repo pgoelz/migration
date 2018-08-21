@@ -69,6 +69,9 @@ class AdditiveModel(Model):
         self.check_valid_matching(matching)
         utility = 0
         for i, l in enumerate(matching):
+            if l is None:
+                continue
+
             utility += self.utility_matrix[i][l]
         return utility
 
