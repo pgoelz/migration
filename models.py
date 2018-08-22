@@ -1,6 +1,6 @@
 from random import random, shuffle
 
-from gurobipy import Model as GurobiModel, GRB, quicksum
+from igraph import Graph
 
 
 class Model:
@@ -258,39 +258,24 @@ class CoordinationModel(Model):
         sum_utilities = 0
         for _ in range(self.random_samples):
             num_jobs = self.locality_num_jobs[l]
-            gm = GurobiModel()
-            gm.setParam("OutputFlag", False)
 
-            vars = [[None for _ in range(num_jobs)] for _ in range(self.num_agents)]
-            vars_by_agent = [[] for _ in range(self.num_agents)]
-            vars_by_job = [[] for _ in range(num_jobs)]
-            objective = 0
+            offset = self.num_agents  # agent i has node id `i`, job j has node id `offset + j`
+            edges = []
 
             for i in agents:
                 for j in range(num_jobs):
                     probability = self.compatibility_probabilities[i][l][j]
                     if random() < probability:
-                        var = gm.addVar(vtype=GRB.INTEGER, name=f"{i}x{j}")
-                        gm.addConstr(0 <= var)
-                        gm.addConstr(var <= 1)
-                        vars[i][j] = var
-                        vars_by_agent[i].append(var)
-                        vars_by_job[j].append(var)
-                        objective += var
+                        edges.append((i, offset + j))
 
-            for agent_vars in vars_by_agent:
-                gm.addConstr(quicksum(agent_vars) <= 1)
-            for job_vars in vars_by_job:
-                gm.addConstr(quicksum(job_vars) <= 1)
+            graph = Graph.Bipartite([0] * self.num_agents + [1] * num_jobs, edges)
+            matching = graph.maximum_bipartite_matching()
 
-            gm.setObjective(objective, GRB.MAXIMIZE)
-            gm.optimize()
-            assert gm.status == GRB.OPTIMAL
-
-            sum_utilities += gm.objval
+            sum_utilities += len(matching)
         utility = sum_utilities / self.random_samples
         self._memoization[l][agents] = utility
         return utility
+
 
     def utility_for_matching(self, matching):
         self.check_valid_matching(matching)
