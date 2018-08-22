@@ -1,9 +1,7 @@
-from random import random
+from random import random, shuffle
 
-from networkx import Graph, max_weight_matching
+from gurobipy import Model as GurobiModel, GRB, quicksum
 
-
-# TODO: Memoize partial random computations per locality, many requests will differ in few localities
 
 class Model:
     """A (submodular) model for the utility of matchings.
@@ -109,6 +107,24 @@ class RetroactiveCorrectionModel(Model):
         assert random_samples > 0
         self.random_samples = random_samples
 
+        self._memoization = [[{} for _ in range(num_professions)] for _ in locality_caps]
+
+    def _utility_at_locality_profession(self, l, p, agents):
+        probs = tuple(sorted(self.qualification_probabilities[i][l] for i in agents))
+        if probs in self._memoization[l][p]:
+            return self._memoization[l][p][probs]
+
+        sum_utilities = 0
+        for _ in range(self.random_samples):
+            num_qualified = 0
+            for prob in probs:
+                if random() < prob:
+                    num_qualified += 1
+            sum_utilities += self.correction_functions[l][p](num_qualified)
+        utility = sum_utilities / self.random_samples
+        self._memoization[l][p][probs] = utility
+        return utility
+
     def utility_for_matching(self, matching):
         self.check_valid_matching(matching)
 
@@ -118,18 +134,11 @@ class RetroactiveCorrectionModel(Model):
                 p = self.professions[i]
                 agents_per_locality_profession[l][p].append(i)
 
-        sum_utilities = 0
-
-        for _ in range(self.random_samples):
-            for l in range(len(self.locality_caps)):
-                for p in range(self.num_professions):
-                    num_qualified = 0
-                    for i in agents_per_locality_profession[l][p]:
-                        if random() < self.qualification_probabilities[i][l]:
-                            num_qualified += 1
-                    sum_utilities += self.correction_functions[l][p](num_qualified)
-
-        return sum_utilities / self.random_samples
+        utility = 0
+        for l in range(len(self.locality_caps)):
+            for p in range(self.num_professions):
+                utility += self._utility_at_locality_profession(l, p, agents_per_locality_profession[l][p])
+        return utility
 
 
 class InterviewModel(Model):
@@ -164,6 +173,28 @@ class InterviewModel(Model):
         assert random_samples > 0
         self.random_samples = random_samples
 
+        self._memoization = [[{} for _ in range(num_professions)] for _ in locality_caps]
+
+    def _utility_at_locality_profession(self, l, p, agents):
+        probs = tuple(sorted(self.compatibility_probabilities[i] for i in agents))
+        if probs in self._memoization[l][p]:
+            return self._memoization[l][p][probs]
+
+        mutable_probs = list(probs)
+        sum_utilities = 0
+        for _ in range(self.random_samples):
+            num_jobs = self.job_numbers[l][p]
+            shuffle(mutable_probs)
+            for prob in mutable_probs:
+                for _ in range(num_jobs):
+                    if random() < prob:
+                        sum_utilities += 1
+                        num_jobs -= 1
+                        break
+        utility = sum_utilities / self.random_samples
+        self._memoization[l][p][probs] = utility
+        return utility
+
     def utility_for_matching(self, matching):
         self.check_valid_matching(matching)
 
@@ -173,18 +204,11 @@ class InterviewModel(Model):
                 p = self.professions[i]
                 agents_per_locality_profession[l][p].append(i)
 
-        sum_utilities = 0
-        for _ in range(self.random_samples):
-            for l in range(len(self.locality_caps)):
-                for p in range(self.num_professions):
-                    num_jobs = self.job_numbers[l][p]
-                    for i in agents_per_locality_profession[l][p]:
-                        for _ in range(num_jobs):
-                            if random() < self.compatibility_probabilities[i]:
-                                sum_utilities += 1
-                                num_jobs -= 1
-
-        return sum_utilities / self.random_samples
+        utility = 0
+        for l in range(len(self.locality_caps)):
+            for p in range(self.num_professions):
+                utility += self._utility_at_locality_profession(l, p, agents_per_locality_profession[l][p])
+        return utility
 
 
 class CoordinationModel(Model):
@@ -224,6 +248,50 @@ class CoordinationModel(Model):
         assert random_samples > 0
         self.random_samples = random_samples
 
+        self._memoization = [{} for _ in locality_caps]
+
+    def _utility_at_locality(self, l, agents):
+        agents = tuple(sorted(agents))
+        if agents in self._memoization[l]:
+            return self._memoization[l][agents]
+
+        sum_utilities = 0
+        for _ in range(self.random_samples):
+            num_jobs = self.locality_num_jobs[l]
+            gm = GurobiModel()
+            gm.setParam("OutputFlag", False)
+
+            vars = [[None for _ in range(num_jobs)] for _ in range(self.num_agents)]
+            vars_by_agent = [[] for _ in range(self.num_agents)]
+            vars_by_job = [[] for _ in range(num_jobs)]
+            objective = 0
+
+            for i in agents:
+                for j in range(num_jobs):
+                    probability = self.compatibility_probabilities[i][l][j]
+                    if random() < probability:
+                        var = gm.addVar(vtype=GRB.INTEGER, name=f"{i}x{j}")
+                        gm.addConstr(0 <= var)
+                        gm.addConstr(var <= 1)
+                        vars[i][j] = var
+                        vars_by_agent[i].append(var)
+                        vars_by_job[j].append(var)
+                        objective += var
+
+            for agent_vars in vars_by_agent:
+                gm.addConstr(quicksum(agent_vars) <= 1)
+            for job_vars in vars_by_job:
+                gm.addConstr(quicksum(job_vars) <= 1)
+
+            gm.setObjective(objective, GRB.MAXIMIZE)
+            gm.optimize()
+            assert gm.status == GRB.OPTIMAL
+
+            sum_utilities += gm.objval
+        utility = sum_utilities / self.random_samples
+        self._memoization[l][agents] = utility
+        return utility
+
     def utility_for_matching(self, matching):
         self.check_valid_matching(matching)
 
@@ -232,19 +300,8 @@ class CoordinationModel(Model):
             if l is not None:
                 agents_per_locality[l].append(i)
 
-        sum_utilities = 0
-        for _ in range(self.random_samples):
-            for l, num_jobs in enumerate(self.locality_num_jobs):
-                graph = Graph()
-                graph.add_nodes_from([("a", i) for i in range(self.num_agents)])
-                graph.add_nodes_from([("j", i) for i in range(num_jobs)])
-                for i in agents_per_locality[l]:
-                    for j in range(num_jobs):
-                        probability = self.compatibility_probabilities[i][l][j]
-                        if random() < probability:
-                            graph.add_edge(("a", i), ("j", j))
-                            print(i, j, "compatible")
-                sum_utilities += len(max_weight_matching(graph))
-                print(max_weight_matching(graph))
-
-        return sum_utilities / self.random_samples
+        utility = 0
+        for l in range(len(self.locality_caps)):
+            for _ in range(self.random_samples):
+                utility += self._utility_at_locality(l, agents_per_locality[l])
+        return utility
