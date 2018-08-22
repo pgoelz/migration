@@ -74,8 +74,10 @@ def additive_optimization(model):
             agent_vars.append(v)
 
             objective += utility * v
+
         variables.append(agent_vars)
         gm.addConstr(quicksum(agent_vars) <= 1)
+
     for l in range(len(model.locality_caps)):
         gm.addConstr(quicksum(variables[i][l] for i in range(model.num_agents)) <= model.locality_caps[l])
 
@@ -89,4 +91,4 @@ def additive_optimization(model):
                 matching[i] = l
                 break
 
-    return matching, gm.objval
+    return matching, model.utility_for_matching(matching)
