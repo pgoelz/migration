@@ -276,7 +276,6 @@ class CoordinationModel(Model):
         self._memoization[l][agents] = utility
         return utility
 
-
     def utility_for_matching(self, matching):
         self.check_valid_matching(matching)
 
@@ -287,6 +286,5 @@ class CoordinationModel(Model):
 
         utility = 0
         for l in range(len(self.locality_caps)):
-            for _ in range(self.random_samples):
-                utility += self._utility_at_locality(l, agents_per_locality[l])
+            utility += self._utility_at_locality(l, agents_per_locality[l])
         return utility

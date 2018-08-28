@@ -1,4 +1,5 @@
 from math import inf
+from random import randrange
 
 from gurobipy import Model as GurobiModel, GRB, quicksum
 
@@ -41,7 +42,7 @@ def greedy_algorithm(model):
         locality_per_agent[i] = l
         caps_remaining[l] -= 1
 
-    return locality_per_agent, best_value
+    return locality_per_agent, model.utility_for_matching(locality_per_agent)
 
 
 def additive_optimization(model):
@@ -92,3 +93,32 @@ def additive_optimization(model):
                 break
 
     return matching, model.utility_for_matching(matching)
+
+
+def best_of_random(model, trials):
+    best_matching = None
+    best_utility = -inf
+
+    for _ in range(trials):
+        matching = [None] * model.num_agents
+        caps_remaining = [cap for cap in model.locality_caps]
+        pairs_remaining = min(model.num_agents, sum(model.locality_caps))
+
+        while pairs_remaining > 0:
+            i = randrange(model.num_agents)
+            if matching[i] is not None:
+                continue
+            while True:
+                l = randrange(len(caps_remaining))
+                if caps_remaining[l] > 0:
+                    break
+            matching[i] = l
+            caps_remaining[l] -= 1
+            pairs_remaining -= 1
+
+        utility = model.utility_for_matching(matching)
+        if utility > best_utility:
+            best_utility = utility
+            best_matching = matching
+
+    return best_matching, model.utility_for_matching(best_matching)
