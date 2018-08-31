@@ -33,11 +33,12 @@ class Model:
             if locality_usage[l] > cap:
                 raise ValueError(f"Matching places {locality_usage[l]} agents in locality {l}, but cap is {cap}.")
 
-    def utility_for_matching(self, matching):
+    def utility_for_matching(self, matching, memoize=True):
         """Computes the utility of a matching.
 
         Args:
             matching (list of (int / None)): for each agent, her locality or None if she remains unmatched
+            memoize (bool): whether the model allowed to use memoized partial utilities for the utility
         Returns:
             a nonnegative float
         Raises:
@@ -63,7 +64,7 @@ class AdditiveModel(Model):
         assert num_agents == 0 or len(utility_matrix[0]) == len(locality_caps)
         self.utility_matrix = utility_matrix
 
-    def utility_for_matching(self, matching):
+    def utility_for_matching(self, matching, memoize=True):
         self.check_valid_matching(matching)
         utility = 0
         for i, l in enumerate(matching):
@@ -109,9 +110,9 @@ class RetroactiveCorrectionModel(Model):
 
         self._memoization = [[{} for _ in range(num_professions)] for _ in locality_caps]
 
-    def _utility_at_locality_profession(self, l, p, agents):
+    def _utility_at_locality_profession(self, l, p, agents, memoize):
         probs = tuple(sorted(self.qualification_probabilities[i][l] for i in agents))
-        if probs in self._memoization[l][p]:
+        if memoize and probs in self._memoization[l][p]:
             return self._memoization[l][p][probs]
 
         sum_utilities = 0
@@ -125,7 +126,7 @@ class RetroactiveCorrectionModel(Model):
         self._memoization[l][p][probs] = utility
         return utility
 
-    def utility_for_matching(self, matching):
+    def utility_for_matching(self, matching, memoize=True):
         self.check_valid_matching(matching)
 
         agents_per_locality_profession = [[[] for _ in range(self.num_professions)] for _ in self.locality_caps]
@@ -137,7 +138,7 @@ class RetroactiveCorrectionModel(Model):
         utility = 0
         for l in range(len(self.locality_caps)):
             for p in range(self.num_professions):
-                utility += self._utility_at_locality_profession(l, p, agents_per_locality_profession[l][p])
+                utility += self._utility_at_locality_profession(l, p, agents_per_locality_profession[l][p], memoize)
         return utility
 
 
@@ -175,9 +176,9 @@ class InterviewModel(Model):
 
         self._memoization = [[{} for _ in range(num_professions)] for _ in locality_caps]
 
-    def _utility_at_locality_profession(self, l, p, agents):
+    def _utility_at_locality_profession(self, l, p, agents, memoize):
         probs = tuple(sorted(self.compatibility_probabilities[i] for i in agents))
-        if probs in self._memoization[l][p]:
+        if memoize and probs in self._memoization[l][p]:
             return self._memoization[l][p][probs]
 
         mutable_probs = list(probs)
@@ -195,7 +196,7 @@ class InterviewModel(Model):
         self._memoization[l][p][probs] = utility
         return utility
 
-    def utility_for_matching(self, matching):
+    def utility_for_matching(self, matching, memoize=True):
         self.check_valid_matching(matching)
 
         agents_per_locality_profession = [[[] for _ in range(self.num_professions)] for _ in self.locality_caps]
@@ -207,7 +208,7 @@ class InterviewModel(Model):
         utility = 0
         for l in range(len(self.locality_caps)):
             for p in range(self.num_professions):
-                utility += self._utility_at_locality_profession(l, p, agents_per_locality_profession[l][p])
+                utility += self._utility_at_locality_profession(l, p, agents_per_locality_profession[l][p], memoize)
         return utility
 
 
@@ -250,9 +251,9 @@ class CoordinationModel(Model):
 
         self._memoization = [{} for _ in locality_caps]
 
-    def _utility_at_locality(self, l, agents):
+    def _utility_at_locality(self, l, agents, memoize):
         agents = tuple(sorted(agents))
-        if agents in self._memoization[l]:
+        if memoize and agents in self._memoization[l]:
             return self._memoization[l][agents]
 
         sum_utilities = 0
@@ -265,6 +266,9 @@ class CoordinationModel(Model):
             for i in agents:
                 for j in range(num_jobs):
                     probability = self.compatibility_probabilities[i][l][j]
+                    if probability == 0:
+                        # Improves simulation performance because random is not called
+                        continue
                     if random() < probability:
                         edges.append((i, offset + j))
 
@@ -276,7 +280,7 @@ class CoordinationModel(Model):
         self._memoization[l][agents] = utility
         return utility
 
-    def utility_for_matching(self, matching):
+    def utility_for_matching(self, matching, memoize=True):
         self.check_valid_matching(matching)
 
         agents_per_locality = [[] for _ in self.locality_caps]
@@ -286,5 +290,5 @@ class CoordinationModel(Model):
 
         utility = 0
         for l in range(len(self.locality_caps)):
-            utility += self._utility_at_locality(l, agents_per_locality[l])
+            utility += self._utility_at_locality(l, agents_per_locality[l], memoize)
         return utility

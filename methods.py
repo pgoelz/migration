@@ -16,7 +16,6 @@ def greedy_algorithm(model):
     """
     locality_per_agent = [None for _ in range(model.num_agents)]
     caps_remaining = [cap for cap in model.locality_caps]
-    best_value = 0
 
     for _ in range(min(model.num_agents, sum(caps_remaining))):
         best_pair = None
@@ -42,7 +41,7 @@ def greedy_algorithm(model):
         locality_per_agent[i] = l
         caps_remaining[l] -= 1
 
-    return locality_per_agent, model.utility_for_matching(locality_per_agent)
+    return locality_per_agent, model.utility_for_matching(locality_per_agent, False)
 
 
 def additive_optimization(model):
@@ -92,7 +91,7 @@ def additive_optimization(model):
                 matching[i] = l
                 break
 
-    return matching, model.utility_for_matching(matching)
+    return matching, model.utility_for_matching(matching, False)
 
 
 def best_of_random(model, trials):
@@ -121,4 +120,4 @@ def best_of_random(model, trials):
             best_utility = utility
             best_matching = matching
 
-    return best_matching, model.utility_for_matching(best_matching)
+    return best_matching, model.utility_for_matching(best_matching, False)
