@@ -57,38 +57,6 @@ class Model:
         raise NotImplementedError
 
 
-class AdditiveModel(Model):
-    """Example model with additive utilities."""
-
-    def __init__(self, num_agents, locality_caps, utility_matrix):
-        """Initializes the additive model.
-
-        Args:
-            num_agents (int): number of simulated agents, named i = 0, …,
-                              num_agents-1
-            locality_caps (list of int): for each locality l = 0, …,
-                                         len(locality_caps), its maximum
-                                         capacity
-            utility_matrix (list of list of float): utility_matrix[i][l] is the
-                                                    utility of matching i to l
-        """
-        self.num_agents = num_agents
-        self.locality_caps = locality_caps
-        assert len(utility_matrix) == num_agents
-        assert num_agents == 0 or len(utility_matrix[0]) == len(locality_caps)
-        self.utility_matrix = utility_matrix
-
-    def utility_for_matching(self, matching, memoize=True):
-        self.check_valid_matching(matching)
-        utility = 0
-        for i, l in enumerate(matching):
-            if l is None:
-                continue
-
-            utility += self.utility_matrix[i][l]
-        return utility
-
-
 class RetroactiveCorrectionModel(Model):
     """Model in which people randomly qualify for employment and that number
     is corrected by a concave function."""
