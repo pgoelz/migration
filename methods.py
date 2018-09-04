@@ -5,14 +5,16 @@ from gurobipy import Model as GurobiModel, GRB, quicksum
 
 
 def greedy_algorithm(model):
-    """The greedy algorithm for maximizing an (approximately) submodular utility function.
+    """The greedy algorithm for maximizing an (approximately) submodular
+    utility function.
 
     Args:
         model (models.Model): The submodular model to use
 
     Returns:
-        a pair (locality_per_agent, best_value) of type (list of int/None, float). The first component is the matching,
-        the second its queried value in the model.
+        pair (locality_per_agent,best_value) of type (list of int/None, float).
+        The first component is the matching, the second its queried value in
+        the model.
     """
     locality_per_agent = [None for _ in range(model.num_agents)]
     caps_remaining = [cap for cap in model.locality_caps]
@@ -41,19 +43,21 @@ def greedy_algorithm(model):
         locality_per_agent[i] = l
         caps_remaining[l] -= 1
 
-    return locality_per_agent, model.utility_for_matching(locality_per_agent, False)
+    return locality_per_agent, model.utility_for_matching(locality_per_agent,
+                                                          False)
 
 
 def additive_optimization(model):
-    """Optimize the model exactly, but just based on marginal utilities of individual migrant-locality pairs and
-    assuming additivity.
+    """Optimize the model exactly, but just based on marginal utilities of
+    individual migrant-locality pairs and assuming additivity.
 
     Args:
         model (models.Model): The submodular model to use
 
     Returns:
-        a pair (locality_per_agent, best_value) of type (list of int/None, float). The first component is the matching,
-        the second its queried value in the model.
+        pair (locality_per_agent,best_value) of type (list of int/None, float).
+        The first component is the matching, the second its queried value in
+        the model.
     """
     gm = GurobiModel()
     gm.setParam("OutputFlag", False)
@@ -79,7 +83,8 @@ def additive_optimization(model):
         gm.addConstr(quicksum(agent_vars) <= 1)
 
     for l in range(len(model.locality_caps)):
-        gm.addConstr(quicksum(variables[i][l] for i in range(model.num_agents)) <= model.locality_caps[l])
+        gm.addConstr(quicksum(variables[i][l] for i in range(model.num_agents))
+                     <= model.locality_caps[l])
 
     gm.setObjective(objective, GRB.MAXIMIZE)
     gm.optimize()
