@@ -90,7 +90,7 @@ class AdditiveModel(Model):
 
 
 class RetroactiveCorrectionModel(Model):
-    """Model in which people randomly qualitfy for employment and that number
+    """Model in which people randomly qualify for employment and that number
     is corrected by a concave function."""
 
     def __init__(self, num_agents, locality_caps, num_professions, professions,
@@ -264,7 +264,7 @@ class CoordinationModel(Model):
     decisions are independent. When all compatibilities in a locality are
     determined, the utility at this locality is the cardinality of a maximum
     matching in the induced bipartite graph between agents and jobs. The total
-    utility is the estimated expectation over possible compatibility
+    utility is the estimated expected value over possible compatibility
     resolutions, summed up over all localities.
     Note that the number of jobs and the cap do not have to coincide. It can be
     reasonable to match more agents to a locality than the number of jobs if it
