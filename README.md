@@ -2,7 +2,10 @@ Read me
 =======
 This repository contains the simulation code for the paper
 
-> REDACTED AUTHORS: Migration as Submodular Optimization. 2018.
+> Paul Gölz and Ariel D. Procaccia: Migration as Submodular Optimization. 2018.
+
+The paper is freely available at
+<http://procaccia.info/papers/migration.pdf>.
 
 Requirements
 ------------
@@ -31,16 +34,24 @@ when importing igraph, then the following StackOverflow answer might help:
 
 Replication of experiments in the paper
 ---------------------------------------
-The individual experiments are provided as Jupyter/IPython notebooks. Running
-`jupyter notebook num_localities.ipynb`, for instance, opens a browser window,
-in which you can see our simulation results and easily rerun them. While we fix
-the random seed to `0` in all our experiments, your simulations might produce
-slightly different results due to different library versions being used,
-non-determinism in these libraries or Python implementation details such as the
-iteration order over dictionaries. For what it is worth, we ran our simulations
-on a MacBook Pro (2017) with a 3.1 GHz Intel Core Duo i5 processor, with 16 GB
-of RAM, and running MacOS 10.12.6.
+The individual experiments are provided as Jupyter/IPython notebooks. If you
+just want to read them, the easiest way is to go to the corresponding page on
+Github, e.g.,
+<https://github.com/pgoelz/migration/blob/master/job_availability.ipynb>, where
+they can be viewed in a browser. If you want to replicate our results or
+experiment with different parameter settings, you need to install the
+dependencies mentioned above. Then, running, say, `jupyter notebook
+num_localities.ipynb` opens a browser window, in which you can see our
+simulation results and easily rerun them.
+
+While we fix the random seed to `0` in all our experiments, your simulations
+might produce slightly different results due to different library versions
+being used, non-determinism in these libraries or Python implementation details
+such as the iteration order over dictionaries. For what it is worth, we ran
+our simulations on a MacBook Pro (2017) with a 3.1 GHz Intel Core Duo i5
+processor, with 16 GB of RAM, and running MacOS 10.12.6.
 
 Questions
 ---------
-For questions on the simulations, please contact REDACTED.
+For questions on the simulations, please contact
+[Paul Gölz](https://paulgoelz.de).
